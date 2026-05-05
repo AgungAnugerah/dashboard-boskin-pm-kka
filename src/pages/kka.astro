@@ -1,0 +1,361 @@
+---
+import DashboardLayout from "../layouts/DashboardLayout.astro";
+import { loadSheetByName } from "../lib/sheet";
+
+const { rows }              = await loadSheetByName("master_kka");
+const { rows: boskinRows }  = await loadSheetByName("master_boskin");
+
+const jenjangOptions     = [...new Set([...rows, ...boskinRows].map(r => (r.jenjang   || "").trim()).filter(Boolean))].sort();
+const wilayahOptions     = [...new Set([...rows, ...boskinRows].map(r => (r.kabupaten || "").trim()).filter(Boolean))].sort();
+const partisipasiOptions = [
+  "Terdata KKA",
+  "Ikut Koding KKA",
+  "Ikut Koding KKA + Dapat BOSKIN",
+  "Ikut Koding KKA + Tidak Dapat BOSKIN",
+  "Dapat BOSKIN + Tidak Terdata KKA",
+  "Dapat BOSKIN + Tidak Ikut Koding KKA",
+];
+
+const schoolKey = (r: Record<string, string>) =>
+  (r.npsn || "").trim() ? `NPSN:${(r.npsn || "").trim()}` : `NAMA:${(r.nama_sekolah || "").trim().toUpperCase()}`;
+
+const initialSchoolCount = new Set(rows.map(schoolKey)).size;
+---
+
+<DashboardLayout title="Dashboard KKA" activePage="kka">
+  <!-- Page Header -->
+  <header class="page-header">
+    <h1 class="page-title">Dashboard Koding dan Kecerdasan Artifisial</h1>
+  </header>
+
+  <!-- Filters -->
+  <section class="filters" style="grid-template-columns: 1.5fr 1fr 1fr 1fr;">
+    <div class="filter">
+      <label for="search">Cari Sekolah / NPSN</label>
+      <input id="search" type="text" placeholder="Nama sekolah atau NPSN..." />
+    </div>
+    <div class="filter dropdown" data-dropdown="jenjang">
+      <label>Jenjang</label>
+      <button class="dropdown-toggle" type="button"><span id="jenjangSummary">Semua Jenjang</span></button>
+      <div class="dropdown-menu" style="display:none;">
+        {jenjangOptions.map(v => (
+          <label class="option"><input type="checkbox" data-kind="jenjang" value={v} /> {v}</label>
+        ))}
+      </div>
+    </div>
+    <div class="filter dropdown" data-dropdown="wilayah">
+      <label>Wilayah</label>
+      <button class="dropdown-toggle" type="button"><span id="wilayahSummary">Semua Wilayah</span></button>
+      <div class="dropdown-menu" style="display:none;">
+        {wilayahOptions.map(v => (
+          <label class="option"><input type="checkbox" data-kind="wilayah" value={v} /> {v}</label>
+        ))}
+      </div>
+    </div>
+    <div class="filter dropdown" data-dropdown="partisipasi">
+      <label>Status Partisipasi</label>
+      <button class="dropdown-toggle" type="button"><span id="partisipasiSummary">Semua Partisipasi</span></button>
+      <div class="dropdown-menu" style="display:none;">
+        {partisipasiOptions.map(v => (
+          <label class="option"><input type="checkbox" data-kind="partisipasi" data-single="true" value={v} /> {v}</label>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- KPI Cards -->
+  <section class="stats-row" style="grid-template-columns: 1fr;">
+    <article class="card">
+      <div class="card-accent-top blue"></div>
+      <div class="card-icon blue">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+          <path fill-rule="evenodd" d="M8.28 5.22a.75.75 0 0 1 0 1.06L4.56 10l3.72 3.72a.75.75 0 1 1-1.06 1.06L2.97 10.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Zm7.44 0a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 1 1-1.06-1.06L19.44 10l-3.72-3.72a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/>
+          <path d="M13.377 2.011a.75.75 0 0 1 .612.867l-2.5 14.5a.75.75 0 0 1-1.478-.255l2.5-14.5a.75.75 0 0 1 .866-.612Z"/>
+        </svg>
+      </div>
+      <div class="label">Total Sekolah KKA</div>
+      <div class="value" id="schoolCount">{initialSchoolCount}</div>
+      <div style="margin-top:10px;border-top:1px solid #e3eaf5;padding-top:12px;">
+        <p class="label">Komposisi Partisipasi KKA vs BOSKIN</p>
+      </div>
+      <div class="pie-wrap" style="min-height:200px; justify-content:center; align-items:center;">
+        <canvas id="partPieChart" style="width:100%!important;height:220px!important;max-width:520px;"></canvas>
+      </div>
+    </article>
+  </section>
+
+  <!-- Bar Chart -->
+  <section class="chart-card">
+    <div class="chart-header">
+      <p class="chart-title">Distribusi Sekolah KKA per Wilayah dan Jenjang</p>
+    </div>
+    <div style="position:relative;height:280px;width:100%;">
+      <canvas id="kkaBarChart"></canvas>
+    </div>
+
+  </section>
+
+  <!-- Data Table -->
+  <section class="table-card">
+    <div class="table-head">
+      Detail Data Sekolah
+      <span class="table-count-badge" id="tableBadge">0 sekolah</span>
+    </div>
+    <div class="table-wrap">
+      <table class="detail-table" style="min-width:940px;">
+        <colgroup>
+          <col style="width:130px;" />
+          <col style="width:360px;" />
+          <col style="width:110px;" />
+          <col style="width:230px;" />
+          <col style="width:200px;" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>NPSN</th>
+            <th>Nama Satuan Pendidikan</th>
+            <th>Jenjang</th>
+            <th>Kabupaten</th>
+            <th>Status KKA</th>
+          </tr>
+        </thead>
+        <tbody id="detailTbody"></tbody>
+      </table>
+      <div class="empty" id="detailEmpty" style="display:none;">Tidak ada data sesuai filter.</div>
+    </div>
+    <div class="table-footer">
+      <span class="pager-info" id="pagerInfo">Menampilkan 0 dari 0</span>
+      <div class="pager-actions">
+        <button class="pager-btn" id="prevPageBtn">← Sebelumnya</button>
+        <button class="pager-btn" id="nextPageBtn">Berikutnya →</button>
+      </div>
+    </div>
+  </section>
+</DashboardLayout>
+
+<script is:inline define:vars={{ rows, boskinRows }}>
+  const kkaRows        = rows || [];
+  const boskinDataRows = boskinRows || [];
+  const searchEl       = document.getElementById("search");
+  const schoolCountEl  = document.getElementById("schoolCount");
+  const detailTbody    = document.getElementById("detailTbody");
+  const detailEmpty    = document.getElementById("detailEmpty");
+  const pagerInfo      = document.getElementById("pagerInfo");
+  const tableBadge     = document.getElementById("tableBadge");
+  const prevPageBtn    = document.getElementById("prevPageBtn");
+  const nextPageBtn    = document.getElementById("nextPageBtn");
+  const dropdowns      = Array.from(document.querySelectorAll(".dropdown"));
+
+  const jenjangOrder  = ["PAUD/TK","SD","SMP","SMA","SMK","KESETARAAN","SLB"];
+  const wilayahOrder  = ["JakartaBarat","JakartaTimur","JakartaSelatan","JakartaUtara","JakartaPusat","KepulauanSeribu"];
+  const wilayahLabel  = {
+    JakartaBarat:"Jak. Barat", JakartaTimur:"Jak. Timur", JakartaSelatan:"Jak. Selatan",
+    JakartaUtara:"Jak. Utara", JakartaPusat:"Jak. Pusat", KepulauanSeribu:"Kep. Seribu"
+  };
+  const jenjangColors = {
+    "PAUD/TK":"#EF4444", SD:"#F97316", SMP:"#6366F1", SMA:"#EAB308", SMK:"#06B6D4", KESETARAAN:"#22C55E", SLB:"#78716C"
+  };
+
+  let barChartRef = null, pieChartRef = null;
+  let currentPage = 1;
+  const pageSize = 25;
+  let lastRows = [];
+
+  function normalizeWilayah(kab) {
+    const k = (kab || "").trim().toUpperCase();
+    if (k === "KOTA ADM. JAKARTA BARAT")   return "JakartaBarat";
+    if (k === "KOTA ADM. JAKARTA TIMUR")   return "JakartaTimur";
+    if (k === "KOTA ADM. JAKARTA SELATAN") return "JakartaSelatan";
+    if (k === "KOTA ADM. JAKARTA UTARA")   return "JakartaUtara";
+    if (k === "KOTA ADM. JAKARTA PUSAT")   return "JakartaPusat";
+    if (k === "KAB. ADM. KEP. SERIBU")     return "KepulauanSeribu";
+    return "";
+  }
+  function schoolKey(r) {
+    const n = (r.npsn || "").trim();
+    return n ? `NPSN:${n}` : `NAMA:${(r.nama_sekolah||"").trim().toUpperCase()}`;
+  }
+  function checkedValues(kind) {
+    return new Set(Array.from(document.querySelectorAll(`input[data-kind="${kind}"]:checked`)).map(x => x.value));
+  }
+  function jenjangBadge(j) {
+    const map = { "PAUD/TK":"paud", SD:"sd", SMP:"smp", SMA:"sma", SMK:"smk", KESETARAAN:"kes", SLB:"slb" };
+    return `<span class="badge badge-${map[j]||"slb"}">${j||"—"}</span>`;
+  }
+  function statusKkaLabel(s) {
+    if (!s.hasKkaData) return "—";
+    return s.ikutKka ? "Ikut Koding KKA" : "Terdata (Belum Ikut)";
+  }
+  function statusKkaBadge(s) {
+    if (!s.hasKkaData) return `<span class="badge badge-gray">Tidak Terdata</span>`;
+    if (s.ikutKka && s.hasBoskin)  return `<span class="badge badge-blue">KKA + BOSKIN</span>`;
+    if (s.ikutKka && !s.hasBoskin) return `<span class="badge badge-green">Ikut KKA</span>`;
+    return `<span class="badge badge-amber">Terdata · Belum Ikut</span>`;
+  }
+  function matchPartisipasi(s, selected) {
+    if (!selected || selected.size === 0) return true;
+    const val = Array.from(selected)[0];
+    if (val === "Terdata KKA")                          return s.hasKkaData;
+    if (val === "Ikut Koding KKA")                      return s.hasKkaData && s.ikutKka;
+    if (val === "Ikut Koding KKA + Dapat BOSKIN")       return s.hasKkaData && s.ikutKka && s.hasBoskin;
+    if (val === "Ikut Koding KKA + Tidak Dapat BOSKIN") return s.hasKkaData && s.ikutKka && !s.hasBoskin;
+    if (val === "Dapat BOSKIN + Tidak Terdata KKA")     return s.hasBoskin && !s.hasKkaData;
+    if (val === "Dapat BOSKIN + Tidak Ikut Koding KKA") return s.hasBoskin && s.hasKkaData && !s.ikutKka;
+    return true;
+  }
+
+  const kkaMap = new Map();
+  kkaRows.forEach(r => {
+    const key = schoolKey(r);
+    if (!kkaMap.has(key)) kkaMap.set(key, { key, npsn:(r.npsn||"").trim(), nama_sekolah:(r.nama_sekolah||"").trim(), jenjang:(r.jenjang||"").trim(), kabupaten:(r.kabupaten||"").trim(), hasKkaData:true, ikutKka:false });
+    const rec = kkaMap.get(key);
+    if ((r.status||"").trim().toLowerCase() === "sudah") rec.ikutKka = true;
+  });
+  const boskinMap = new Map();
+  boskinDataRows.forEach(r => {
+    const key = schoolKey(r);
+    if (!boskinMap.has(key)) boskinMap.set(key, { key, npsn:(r.npsn||"").trim(), nama_sekolah:(r.nama_sekolah||"").trim(), jenjang:(r.jenjang||"").trim(), kabupaten:(r.kabupaten||"").trim() });
+  });
+  const schoolUniverse = [];
+  kkaMap.forEach((k, key) => {
+    const b = boskinMap.get(key);
+    schoolUniverse.push({ ...k, hasBoskin:Boolean(b), jenjang:k.jenjang||(b?.jenjang||""), kabupaten:k.kabupaten||(b?.kabupaten||"") });
+  });
+  boskinMap.forEach((b, key) => {
+    if (kkaMap.has(key)) return;
+    schoolUniverse.push({ key, npsn:b.npsn, nama_sekolah:b.nama_sekolah, jenjang:b.jenjang, kabupaten:b.kabupaten, hasKkaData:false, ikutKka:false, hasBoskin:true });
+  });
+
+  async function ensureChart() {
+    if (window.Chart) return window.Chart;
+    const mod = await import("https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js");
+    return mod.Chart || window.Chart;
+  }
+
+  async function renderCharts(filtered) {
+    const Chart = await ensureChart();
+    const terdata         = filtered.filter(s => s.hasKkaData).length;
+    const ikut            = filtered.filter(s => s.hasKkaData && s.ikutKka).length;
+    const ikutBoskin      = filtered.filter(s => s.hasKkaData && s.ikutKka && s.hasBoskin).length;
+    const ikutTanpaBoskin = filtered.filter(s => s.hasKkaData && s.ikutKka && !s.hasBoskin).length;
+    const boskinTidakKka  = filtered.filter(s => s.hasBoskin && !s.hasKkaData).length;
+    const boskinTidakIkut = filtered.filter(s => s.hasBoskin && s.hasKkaData && !s.ikutKka).length;
+
+    // Pie
+    const pieCtx = document.getElementById("partPieChart");
+    if (pieChartRef) pieChartRef.destroy();
+    pieChartRef = new Chart(pieCtx, {
+      type:"doughnut",
+      data:{
+        labels:["Ikut KKA + BOSKIN","Ikut KKA Saja","Terdata · Belum Ikut","BOSKIN · Tdk Terdata KKA","BOSKIN · Tdk Ikut KKA"],
+        datasets:[{ data:[ikutBoskin, ikutTanpaBoskin, boskinTidakIkut, boskinTidakKka, terdata - ikut], backgroundColor:["#297BBF","#22C55E","#F59E0B","#94A3B8","#EF4444"], borderWidth:2, borderColor:"#fff" }]
+      },
+      options:{
+        plugins:{
+          legend:{
+            display:true,
+            position:"bottom",
+            labels:{ boxWidth:10, boxHeight:10, padding:16, font:{ size:11 } }
+          }
+        },
+        maintainAspectRatio:false,
+        cutout:"62%"
+      }
+    });
+
+
+    // Bar
+    const matrix = {};
+    jenjangOrder.forEach(j => { matrix[j] = {}; wilayahOrder.forEach(w => matrix[j][w] = { withBoskin:0, withoutBoskin:0 }); });
+    filtered.forEach(s => {
+      if (!(s.hasKkaData && s.ikutKka)) return;
+      const j = (s.jenjang||"").trim();
+      const w = normalizeWilayah(s.kabupaten||"");
+      if (!jenjangOrder.includes(j) || !wilayahOrder.includes(w)) return;
+      if (s.hasBoskin) matrix[j][w].withBoskin++;
+      else matrix[j][w].withoutBoskin++;
+    });
+    const datasets = [];
+    jenjangOrder.forEach(j => {
+      const col = jenjangColors[j] || "#64748b";
+      datasets.push({ label:`${j} · KKA+BOSKIN`, stack:j, data:wilayahOrder.map(w=>matrix[j][w].withBoskin), backgroundColor:col, borderColor:"#fff", borderWidth:1, borderRadius:3, barPercentage:0.85, categoryPercentage:0.7 });
+      datasets.push({ label:`${j} · KKA Saja`,   stack:j, data:wilayahOrder.map(w=>matrix[j][w].withoutBoskin), backgroundColor:col+"66", borderColor:"#fff", borderWidth:1, borderRadius:3, barPercentage:0.85, categoryPercentage:0.7 });
+    });
+    const barCtx = document.getElementById("kkaBarChart");
+    if (barChartRef) barChartRef.destroy();
+    barChartRef = new Chart(barCtx, {
+      type:"bar",
+      data:{ labels:wilayahOrder.map(w=>wilayahLabel[w]||w), datasets },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } },
+        scales:{ x:{ stacked:true, grid:{ display:false }, ticks:{ font:{size:11}, color:"#4D6880" } }, y:{ stacked:true, beginAtZero:true, ticks:{ precision:0, font:{size:11}, color:"#4D6880" }, grid:{ color:"#E8F2F9" } } } }
+    });
+  }
+
+  function renderTablePage() {
+    const totalRows  = lastRows.length;
+    const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+    if (currentPage > totalPages) currentPage = totalPages;
+    const start = (currentPage - 1) * pageSize;
+    const end   = Math.min(start + pageSize, totalRows);
+    const pageRows = lastRows.slice(start, end);
+    detailTbody.innerHTML = pageRows.map(r => `
+      <tr>
+        <td style="font-family:monospace;font-size:12px;color:#4D6880;">${r.npsn||"—"}</td>
+        <td style="font-weight:500;">${r.nama_sekolah||"—"}</td>
+        <td>${jenjangBadge(r.jenjang)}</td>
+        <td style="color:#4D6880;">${r.kabupaten||"—"}</td>
+        <td>${statusKkaBadge(r)}</td>
+      </tr>`).join("");
+    detailEmpty.style.display = totalRows ? "none" : "block";
+    pagerInfo.textContent = totalRows ? `Menampilkan ${start+1}–${end} dari ${totalRows}` : "Menampilkan 0 dari 0";
+    tableBadge.textContent = `${totalRows} sekolah`;
+    prevPageBtn.disabled = currentPage <= 1;
+    nextPageBtn.disabled = currentPage >= totalPages;
+  }
+
+  function applyFilters() {
+    const q = (searchEl.value||"").trim().toLowerCase();
+    const jenjangSet = checkedValues("jenjang");
+    const wilayahSet = checkedValues("wilayah");
+    const partSet    = checkedValues("partisipasi");
+
+    const filteredSchools = schoolUniverse.filter(s => {
+      const qOk = !q || (s.nama_sekolah||"").toLowerCase().includes(q) || (s.npsn||"").toLowerCase().includes(q);
+      const jOk = jenjangSet.size===0 || jenjangSet.has((s.jenjang||"").trim());
+      const wOk = wilayahSet.size===0 || wilayahSet.has((s.kabupaten||"").trim());
+      const pOk = matchPartisipasi(s, partSet);
+      return qOk && jOk && wOk && pOk;
+    });
+
+    const selectedPart = Array.from(partSet)[0] || "";
+    const statCount = filteredSchools.filter(s => s.hasKkaData || selectedPart === "Dapat BOSKIN + Tidak Terdata KKA").length;
+    schoolCountEl.textContent = String(statCount);
+    document.getElementById("jenjangSummary").textContent     = jenjangSet.size ? `${jenjangSet.size} dipilih` : "Semua Jenjang";
+    document.getElementById("wilayahSummary").textContent     = wilayahSet.size ? `${wilayahSet.size} dipilih` : "Semua Wilayah";
+    document.getElementById("partisipasiSummary").textContent = partSet.size ? Array.from(partSet)[0] : "Semua Partisipasi";
+
+    lastRows = [...filteredSchools].sort((a,b) => (a.nama_sekolah||"").localeCompare(b.nama_sekolah||""));
+    currentPage = 1;
+    renderTablePage();
+    renderCharts(filteredSchools);
+  }
+
+  [searchEl, ...document.querySelectorAll("input[type='checkbox']")].forEach(el => {
+    if (el.dataset.kind === "partisipasi" && el.dataset.single === "true") {
+      el.addEventListener("change", () => {
+        if (!el.checked) return;
+        document.querySelectorAll("input[data-kind='partisipasi']").forEach(x => { if (x !== el) x.checked = false; });
+      });
+    }
+    el.addEventListener("input", applyFilters);
+    el.addEventListener("change", applyFilters);
+  });
+  dropdowns.forEach(dd => {
+    const btn = dd.querySelector(".dropdown-toggle");
+    btn.addEventListener("click", e => { e.stopPropagation(); dropdowns.forEach(x => x !== dd && x.classList.remove("open")); dd.classList.toggle("open"); });
+  });
+  document.addEventListener("click", () => dropdowns.forEach(x => x.classList.remove("open")));
+  prevPageBtn.addEventListener("click", () => { if (currentPage > 1) { currentPage--; renderTablePage(); } });
+  nextPageBtn.addEventListener("click", () => { const tp = Math.max(1, Math.ceil(lastRows.length/pageSize)); if (currentPage < tp) { currentPage++; renderTablePage(); } });
+  applyFilters();
+</script>

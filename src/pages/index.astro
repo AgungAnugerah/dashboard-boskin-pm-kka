@@ -1,17 +1,358 @@
 ---
+import DashboardLayout from "../layouts/DashboardLayout.astro";
+import { loadSheetByName } from "../lib/sheet";
 
+const { rows } = await loadSheetByName("master_boskin");
+const jenjangOptions = [...new Set(rows.map((r) => (r.jenjang || "").trim()).filter(Boolean))].sort();
+const statusSekolahOptions = [...new Set(rows.map((r) => (r.status_sekolah || "").trim()).filter(Boolean))].sort();
+const wilayahOptions = [...new Set(rows.map((r) => (r.kabupaten || "").trim()).filter(Boolean))].sort();
+
+const schoolKey = (r: Record<string, string>) =>
+  (r.npsn || "").trim() ? `NPSN:${(r.npsn || "").trim()}` : `NAMA:${(r.nama_sekolah || "").trim().toUpperCase()}`;
+
+const uniqueSchools = [...new Map(rows.map((r) => [schoolKey(r), r])).values()];
+const initialCount = uniqueSchools.length;
+const initialNegeri = uniqueSchools.filter((r) => (r.status_sekolah || "").trim().toUpperCase() === "NEGERI").length;
+const initialSwasta = uniqueSchools.filter((r) => (r.status_sekolah || "").trim().toUpperCase() === "SWASTA").length;
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<DashboardLayout title="Dashboard BOS Kinerja" activePage="boskin">
+  <!-- Page Header -->
+  <header class="page-header">
+    <h1 class="page-title">Dashboard Bos Kinerja</h1>
+  </header>
+
+  <!-- Filters -->
+  <section class="filters" style="grid-template-columns: 1.5fr 1fr 1fr 1fr;">
+    <div class="filter">
+      <label for="search">Cari Sekolah / NPSN</label>
+      <input id="search" type="text" placeholder="Nama sekolah atau NPSN..." />
+    </div>
+    <div class="filter dropdown" data-dropdown="jenjang">
+      <label>Jenjang</label>
+      <button class="dropdown-toggle" type="button"><span id="jenjangSummary">Semua Jenjang</span></button>
+      <div class="dropdown-menu" style="display:none;">
+        {jenjangOptions.map((v) => (
+          <label class="option"><input type="checkbox" data-kind="jenjang" value={v} /> {v}</label>
+        ))}
+      </div>
+    </div>
+    <div class="filter dropdown" data-dropdown="status">
+      <label>Status Sekolah</label>
+      <button class="dropdown-toggle" type="button"><span id="statusSummary">Semua Status</span></button>
+      <div class="dropdown-menu" style="display:none;">
+        {statusSekolahOptions.map((v) => (
+          <label class="option"><input type="checkbox" data-kind="status" value={v} /> {v}</label>
+        ))}
+      </div>
+    </div>
+    <div class="filter dropdown" data-dropdown="wilayah">
+      <label>Wilayah</label>
+      <button class="dropdown-toggle" type="button"><span id="wilayahSummary">Semua Wilayah</span></button>
+      <div class="dropdown-menu" style="display:none;">
+        {wilayahOptions.map((v) => (
+          <label class="option"><input type="checkbox" data-kind="wilayah" value={v} /> {v}</label>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- KPI Cards -->
+  <section class="stats-row" style="grid-template-columns: 1fr; align-items: stretch;">
+    <article class="card">
+      <div class="card-accent-top blue"></div>
+      <div class="card-icon blue">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 10a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v9H3v-9Zm7-4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v13h-4V6Zm7 7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v6h-4v-6Z"/></svg>
+      </div>
+      <div class="label">Total Sekolah</div>
+      <div class="value" id="schoolCount">{initialCount}</div>
+      <div style="margin-top:10px;border-top:1px solid #e3eaf5;padding-top:12px;">
+        <div class="label">Komposisi Status Sekolah</div>
+      </div>
+      <div style="position:relative;height:220px;width:100%;display:flex;justify-content:center;align-items:center;margin-top:6px;">
+        <canvas id="statusPieChart" style="max-width:220px;max-height:220px;"></canvas>
+      </div>
+    </article>
+  </section>
+
+  <!-- Bar Chart -->
+  <section class="chart-card">
+    <div class="chart-header">
+      <p class="chart-title">Distribusi Sekolah per Wilayah dan Jenjang</p>
+    </div>
+    <div style="position:relative;height:280px;width:100%;">
+      <canvas id="boskinChart"></canvas>
+    </div>
+
+  </section>
+
+  <!-- Data Table -->
+  <section class="table-card">
+    <div class="table-head">
+      Detail Data
+      <span class="table-count-badge" id="tableBadge">0 sekolah</span>
+    </div>
+    <div class="table-wrap">
+      <table class="detail-table" style="min-width:920px;">
+        <colgroup>
+          <col style="width:130px;" />
+          <col style="width:360px;" />
+          <col style="width:110px;" />
+          <col style="width:140px;" />
+          <col style="width:230px;" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>NPSN</th>
+            <th>Nama Sekolah</th>
+            <th>Jenjang</th>
+            <th>Status</th>
+            <th>Kabupaten</th>
+          </tr>
+        </thead>
+        <tbody id="detailTbody"></tbody>
+      </table>
+      <div class="empty" id="detailEmpty" style="display:none;">Tidak ada data sesuai filter.</div>
+    </div>
+    <div class="table-footer">
+      <span class="pager-info" id="pagerInfo">Menampilkan 0 dari 0</span>
+      <div class="pager-actions">
+        <button class="pager-btn" id="prevPageBtn">← Sebelumnya</button>
+        <button class="pager-btn" id="nextPageBtn">Berikutnya →</button>
+      </div>
+    </div>
+  </section>
+</DashboardLayout>
+
+<script is:inline define:vars={{ rows }}>
+  const dataRows = rows || [];
+  const searchEl = document.getElementById("search");
+  const schoolCountEl = document.getElementById("schoolCount");
+  const detailTbody   = document.getElementById("detailTbody");
+  const detailEmpty   = document.getElementById("detailEmpty");
+  const pagerInfo     = document.getElementById("pagerInfo");
+  const tableBadge    = document.getElementById("tableBadge");
+  const prevPageBtn   = document.getElementById("prevPageBtn");
+  const nextPageBtn   = document.getElementById("nextPageBtn");
+  const dropdowns     = Array.from(document.querySelectorAll(".dropdown"));
+
+  let chartRef = null;
+  let pieChartRef = null;
+  let currentPage = 1;
+  const pageSize = 25;
+  let lastUniqueRows = [];
+
+  const jenjangOrder = ["PAUD/TK","SD","SMP","SMA","SMK","KESETARAAN","SLB"];
+  const wilayahOrder = ["JakartaBarat","JakartaTimur","JakartaSelatan","JakartaUtara","JakartaPusat","KepulauanSeribu"];
+  const wilayahLabel = {
+    JakartaBarat:"Jak. Barat", JakartaTimur:"Jak. Timur", JakartaSelatan:"Jak. Selatan",
+    JakartaUtara:"Jak. Utara", JakartaPusat:"Jak. Pusat", KepulauanSeribu:"Kep. Seribu"
+  };
+  const warna = {
+    "PAUD/TK":"#EF4444", SD:"#F97316", SMP:"#6366F1", SMA:"#EAB308", SMK:"#06B6D4", KESETARAAN:"#22C55E", SLB:"#78716C"
+  };
+
+  function normalizeWilayah(kab) {
+    const k = (kab || "").trim().toUpperCase();
+    if (k === "KOTA ADM. JAKARTA BARAT")   return "JakartaBarat";
+    if (k === "KOTA ADM. JAKARTA TIMUR")   return "JakartaTimur";
+    if (k === "KOTA ADM. JAKARTA SELATAN") return "JakartaSelatan";
+    if (k === "KOTA ADM. JAKARTA UTARA")   return "JakartaUtara";
+    if (k === "KOTA ADM. JAKARTA PUSAT")   return "JakartaPusat";
+    if (k === "KAB. ADM. KEP. SERIBU")     return "KepulauanSeribu";
+    return "TidakDiketahui";
+  }
+  function schoolKey(row) {
+    const npsn = (row.npsn || "").trim();
+    return npsn ? `NPSN:${npsn}` : `NAMA:${(row.nama_sekolah || "").trim().toUpperCase()}`;
+  }
+  function checkedValues(kind) {
+    return new Set(Array.from(document.querySelectorAll(`input[data-kind="${kind}"]:checked`)).map(x => x.value));
+  }
+  function jenjangBadge(j) {
+    const map = {
+      "PAUD/TK":"paud", SD:"sd", SMP:"smp", SMA:"sma", SMK:"smk", KESETARAAN:"kes", SLB:"slb"
+    };
+    const cls = map[j] || "slb";
+    return `<span class="badge badge-${cls}">${j || "-"}</span>`;
+  }
+  function statusBadge(s) {
+    const v = (s || "").trim().toUpperCase();
+    if (v === "NEGERI")  return `<span class="badge badge-negeri">Negeri</span>`;
+    if (v === "SWASTA")  return `<span class="badge badge-swasta">Swasta</span>`;
+    return `<span class="badge badge-gray">${s || "-"}</span>`;
+  }
+
+  async function ensureChart() {
+    if (window.Chart) return window.Chart;
+    const mod = await import("https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js");
+    return mod.Chart || window.Chart;
+  }
+
+  async function renderChart(filteredRows) {
+    const Chart = await ensureChart();
+    const bySchool = new Map();
+    filteredRows.forEach(r => bySchool.set(schoolKey(r), r));
+    const uniqueRows = Array.from(bySchool.values());
+
+    const negeriMatrix = {};
+    const swastaMatrix = {};
+    jenjangOrder.forEach(j => {
+      negeriMatrix[j] = {};
+      swastaMatrix[j] = {};
+      wilayahOrder.forEach(w => { negeriMatrix[j][w] = 0; swastaMatrix[j][w] = 0; });
+    });
+    uniqueRows.forEach(r => {
+      const j = (r.jenjang || "").trim();
+      const w = normalizeWilayah(r.kabupaten || "");
+      const s = (r.status_sekolah || "").trim().toUpperCase();
+      if (jenjangOrder.includes(j) && wilayahOrder.includes(w)) {
+        if (s === "NEGERI") negeriMatrix[j][w] += 1;
+        else if (s === "SWASTA") swastaMatrix[j][w] += 1;
+      }
+    });
+
+    const datasets = [];
+    jenjangOrder.forEach(j => {
+      const col = warna[j] || "#64748b";
+      datasets.push({
+        label: `${j} · Negeri`,
+        data: wilayahOrder.map(w => negeriMatrix[j][w]),
+        backgroundColor: col, borderColor: "#fff", borderWidth: 1,
+        stack: j, borderRadius: 3, barPercentage: 0.85, categoryPercentage: 0.7
+      });
+      datasets.push({
+        label: `${j} · Swasta`,
+        data: wilayahOrder.map(w => swastaMatrix[j][w]),
+        backgroundColor: col + "66", borderColor: "#fff", borderWidth: 1,
+        stack: j, borderRadius: 3, barPercentage: 0.85, categoryPercentage: 0.7
+      });
+    });
+
+    const ctx = document.getElementById("boskinChart");
+    if (chartRef) chartRef.destroy();
+    chartRef = new Chart(ctx, {
+      type: "bar",
+      data: { labels: wilayahOrder.map(w => wilayahLabel[w] || w), datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 }, color: "#4D6880" } },
+          y: { stacked: true, beginAtZero: true, ticks: { precision: 0, font: { size: 11 }, color: "#4D6880" }, grid: { color: "#E8F2F9" } }
+        }
+      }
+    });
+
+  }
+
+  async function renderPie(negeri, swasta) {
+    const Chart = await ensureChart();
+    const ctx = document.getElementById("statusPieChart");
+    if (pieChartRef) pieChartRef.destroy();
+    pieChartRef = new Chart(ctx, {
+      type: "pie",
+      data: {
+        labels: ["NEGERI", "SWASTA"],
+        datasets: [{
+          data: [negeri, swasta],
+          backgroundColor: ["#2563EB", "#0EA5A4"]
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            position: "bottom",
+            labels: { boxWidth: 10, boxHeight: 10, padding: 16, font: { size: 11 } }
+          }
+        }
+      }
+    });
+  }
+
+  function applyFilters() {
+    const q = (searchEl.value || "").trim().toLowerCase();
+    const jenjangSet = checkedValues("jenjang");
+    const statusSet  = checkedValues("status");
+    const wilayahSet = checkedValues("wilayah");
+
+    const filtered = dataRows.filter(r => {
+      const nama = (r.nama_sekolah || "").toLowerCase();
+      const npsn = (r.npsn || "").toLowerCase();
+      const qOk = !q || nama.includes(q) || npsn.includes(q);
+      const jOk = jenjangSet.size === 0 || jenjangSet.has((r.jenjang || "").trim());
+      const sOk = statusSet.size  === 0 || statusSet.has((r.status_sekolah || "").trim());
+      const kab = (r.kabupaten || "").trim();
+      const wOk = wilayahSet.size === 0 || wilayahSet.has(kab);
+      return qOk && jOk && sOk && wOk;
+    });
+
+    const bySchool = new Map();
+    filtered.forEach(r => bySchool.set(schoolKey(r), r));
+    const uniqueRows = Array.from(bySchool.values()).sort((a, b) =>
+      (a.nama_sekolah || "").localeCompare(b.nama_sekolah || "")
+    );
+
+    const total   = uniqueRows.length;
+    const negeri  = uniqueRows.filter(r => (r.status_sekolah || "").trim().toUpperCase() === "NEGERI").length;
+    const swasta  = uniqueRows.filter(r => (r.status_sekolah || "").trim().toUpperCase() === "SWASTA").length;
+
+    schoolCountEl.textContent = String(total);
+    document.getElementById("jenjangSummary").textContent = jenjangSet.size ? `${jenjangSet.size} dipilih` : "Semua Jenjang";
+    document.getElementById("statusSummary").textContent  = statusSet.size  ? `${statusSet.size} dipilih`  : "Semua Status";
+    document.getElementById("wilayahSummary").textContent = wilayahSet.size ? `${wilayahSet.size} dipilih` : "Semua Wilayah";
+
+    lastUniqueRows = uniqueRows;
+    currentPage = 1;
+    renderTablePage();
+    renderChart(filtered);
+    renderPie(negeri, swasta);
+  }
+
+  function renderTablePage() {
+    const totalRows  = lastUniqueRows.length;
+    const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+    if (currentPage > totalPages) currentPage = totalPages;
+    const start = (currentPage - 1) * pageSize;
+    const end   = Math.min(start + pageSize, totalRows);
+    const pageRows = lastUniqueRows.slice(start, end);
+
+    detailTbody.innerHTML = pageRows.map(r => `
+      <tr>
+        <td style="font-family:monospace;font-size:12px;color:#4D6880;">${r.npsn || "—"}</td>
+        <td style="font-weight:500;">${r.nama_sekolah || "—"}</td>
+        <td>${jenjangBadge(r.jenjang)}</td>
+        <td>${statusBadge(r.status_sekolah)}</td>
+        <td style="color:#4D6880;">${r.kabupaten || "—"}</td>
+      </tr>`).join("");
+
+    detailEmpty.style.display = totalRows ? "none" : "block";
+    pagerInfo.textContent = totalRows ? `Menampilkan ${start + 1}–${end} dari ${totalRows}` : "Menampilkan 0 dari 0";
+    tableBadge.textContent = `${totalRows} sekolah`;
+    prevPageBtn.disabled = currentPage <= 1;
+    nextPageBtn.disabled = currentPage >= totalPages;
+  }
+
+  [searchEl, ...document.querySelectorAll("input[type='checkbox']")].forEach(el => {
+    el.addEventListener("input",  applyFilters);
+    el.addEventListener("change", applyFilters);
+  });
+  dropdowns.forEach(dd => {
+    const btn = dd.querySelector(".dropdown-toggle");
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      dropdowns.forEach(x => x !== dd && x.classList.remove("open"));
+      dd.classList.toggle("open");
+    });
+  });
+  document.addEventListener("click", () => dropdowns.forEach(x => x.classList.remove("open")));
+  prevPageBtn.addEventListener("click", () => { if (currentPage > 1) { currentPage--; renderTablePage(); } });
+  nextPageBtn.addEventListener("click", () => {
+    const totalPages = Math.max(1, Math.ceil(lastUniqueRows.length / pageSize));
+    if (currentPage < totalPages) { currentPage++; renderTablePage(); }
+  });
+  applyFilters();
+</script>
