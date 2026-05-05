@@ -29,8 +29,8 @@ const initialSwasta = uniqueSchools.filter((r) => (r.status_sekolah || "").trim(
       <input id="search" type="text" placeholder="Nama sekolah atau NPSN..." />
     </div>
     <div class="filter dropdown" data-dropdown="jenjang">
-      <label>Jenjang</label>
-      <button class="dropdown-toggle" type="button"><span id="jenjangSummary">Semua Jenjang</span></button>
+      <label for="jenjangFilterBtn">Jenjang</label>
+      <button id="jenjangFilterBtn" class="dropdown-toggle" type="button"><span id="jenjangSummary">Semua Jenjang</span></button>
       <div class="dropdown-menu" style="display:none;">
         {jenjangOptions.map((v) => (
           <label class="option"><input type="checkbox" data-kind="jenjang" value={v} /> {v}</label>
@@ -38,8 +38,8 @@ const initialSwasta = uniqueSchools.filter((r) => (r.status_sekolah || "").trim(
       </div>
     </div>
     <div class="filter dropdown" data-dropdown="status">
-      <label>Status Sekolah</label>
-      <button class="dropdown-toggle" type="button"><span id="statusSummary">Semua Status</span></button>
+      <label for="statusFilterBtn">Status Sekolah</label>
+      <button id="statusFilterBtn" class="dropdown-toggle" type="button"><span id="statusSummary">Semua Status</span></button>
       <div class="dropdown-menu" style="display:none;">
         {statusSekolahOptions.map((v) => (
           <label class="option"><input type="checkbox" data-kind="status" value={v} /> {v}</label>
@@ -47,8 +47,8 @@ const initialSwasta = uniqueSchools.filter((r) => (r.status_sekolah || "").trim(
       </div>
     </div>
     <div class="filter dropdown" data-dropdown="wilayah">
-      <label>Wilayah</label>
-      <button class="dropdown-toggle" type="button"><span id="wilayahSummary">Semua Wilayah</span></button>
+      <label for="wilayahFilterBtn">Wilayah</label>
+      <button id="wilayahFilterBtn" class="dropdown-toggle" type="button"><span id="wilayahSummary">Semua Wilayah</span></button>
       <div class="dropdown-menu" style="display:none;">
         {wilayahOptions.map((v) => (
           <label class="option"><input type="checkbox" data-kind="wilayah" value={v} /> {v}</label>

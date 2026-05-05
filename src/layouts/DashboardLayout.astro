@@ -5,13 +5,15 @@ interface Props {
 }
 const { title, activePage } = Astro.props;
 import Analytics from "@vercel/analytics/astro";
+import { Image } from "astro:assets";
+import logoSidebar from "../assets/logo1.png";
 ---
 
 <html lang="id">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" type="image/jpeg" href="/iconnn.jpg" />
-    <link rel="shortcut icon" type="image/jpeg" href="/iconnn.jpg" />
+    <link rel="icon" type="image/png" href="/iconnn.png" />
+    <link rel="shortcut icon" type="image/png" href="/iconnn.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
@@ -668,7 +670,7 @@ import Analytics from "@vercel/analytics/astro";
         </nav>
 
         <div class="sidebar-footer">
-          <img src="/logo/logo1.png" alt="BPMP DKI Jakarta" class="sidebar-logo" />
+          <Image src={logoSidebar} alt="BPMP DKI Jakarta" class="sidebar-logo" loading="eager" />
           <p class="sidebar-copyright">© 2026 BPMP DKI JAKARTA</p>
           <a href="https://www.linkedin.com/in/agunganugerah/" class="sidebar-author" target="_blank" rel="noopener noreferrer">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">

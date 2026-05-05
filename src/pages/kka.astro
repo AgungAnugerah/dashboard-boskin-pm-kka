@@ -35,8 +35,8 @@ const initialSchoolCount = new Set(rows.map(schoolKey)).size;
       <input id="search" type="text" placeholder="Nama sekolah atau NPSN..." />
     </div>
     <div class="filter dropdown" data-dropdown="jenjang">
-      <label>Jenjang</label>
-      <button class="dropdown-toggle" type="button"><span id="jenjangSummary">Semua Jenjang</span></button>
+      <label for="jenjangFilterBtn">Jenjang</label>
+      <button id="jenjangFilterBtn" class="dropdown-toggle" type="button"><span id="jenjangSummary">Semua Jenjang</span></button>
       <div class="dropdown-menu" style="display:none;">
         {jenjangOptions.map(v => (
           <label class="option"><input type="checkbox" data-kind="jenjang" value={v} /> {v}</label>
@@ -44,8 +44,8 @@ const initialSchoolCount = new Set(rows.map(schoolKey)).size;
       </div>
     </div>
     <div class="filter dropdown" data-dropdown="wilayah">
-      <label>Wilayah</label>
-      <button class="dropdown-toggle" type="button"><span id="wilayahSummary">Semua Wilayah</span></button>
+      <label for="wilayahFilterBtn">Wilayah</label>
+      <button id="wilayahFilterBtn" class="dropdown-toggle" type="button"><span id="wilayahSummary">Semua Wilayah</span></button>
       <div class="dropdown-menu" style="display:none;">
         {wilayahOptions.map(v => (
           <label class="option"><input type="checkbox" data-kind="wilayah" value={v} /> {v}</label>
@@ -53,8 +53,8 @@ const initialSchoolCount = new Set(rows.map(schoolKey)).size;
       </div>
     </div>
     <div class="filter dropdown" data-dropdown="partisipasi">
-      <label>Status Partisipasi</label>
-      <button class="dropdown-toggle" type="button"><span id="partisipasiSummary">Semua Partisipasi</span></button>
+      <label for="partisipasiFilterBtn">Status Partisipasi</label>
+      <button id="partisipasiFilterBtn" class="dropdown-toggle" type="button"><span id="partisipasiSummary">Semua Partisipasi</span></button>
       <div class="dropdown-menu" style="display:none;">
         {partisipasiOptions.map(v => (
           <label class="option"><input type="checkbox" data-kind="partisipasi" data-single="true" value={v} /> {v}</label>
