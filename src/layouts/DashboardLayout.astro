@@ -4,6 +4,7 @@ interface Props {
   activePage: "boskin" | "pm" | "kka";
 }
 const { title, activePage } = Astro.props;
+import Analytics from "@vercel/analytics/astro";
 ---
 
 <html lang="id">
@@ -685,5 +686,6 @@ const { title, activePage } = Astro.props;
         </div>
       </main>
     </div>
+    <Analytics />
   </body>
 </html>
